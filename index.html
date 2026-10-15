@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Flip Clock</title>
+<meta name="description" content="Minimalist pure-black flip clock with alarms, timer and stopwatch.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Flip Clock">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="h-[100dvh] w-screen flex flex-col justify-between bg-oled text-white font-sans antialiased selection:bg-white selection:text-black">
+
+    <!-- Top Bar -->
+    <header class="w-full max-w-2xl mx-auto px-6 pt-5 pb-2 flex items-center justify-between shrink-0 z-30">
+        <div class="flex items-center gap-2.5">
+            <div class="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+            <span id="header-title" class="text-xs uppercase tracking-[0.25em] text-neutral-400 font-semibold">Clock</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <!-- Sound Test / Mute Indicator -->
+            <button id="sound-toggle-btn" onclick="toggleMute()" class="text-xs uppercase tracking-widest text-neutral-400 hover:text-white transition px-2.5 py-1 rounded-full border border-neutral-800 bg-neutral-950 flex items-center gap-1.5" title="Toggle Audio Alerts">
+                <svg id="sound-on-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                </svg>
+                <svg id="sound-off-icon" class="w-3.5 h-3.5 hidden text-neutral-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
+                </svg>
+                <span id="sound-label" class="hidden min-[420px]:inline text-[10px]">Sound On</span>
+            </button>
+            <!-- 12H / 24H Switch -->
+            <button id="format-toggle-btn" onclick="toggleTimeFormat()" class="text-[10px] font-mono uppercase tracking-widest text-neutral-300 hover:text-white transition px-2.5 py-1 rounded-full border border-neutral-800 bg-neutral-950">
+                24H
+            </button>
+        </div>
+    </header>
+
+    <!-- Non-Blocking Alert Banner -->
+    <div id="alert-banner" class="hidden fixed top-16 left-1/2 -translate-x-1/2 w-[92%] max-w-md bg-neutral-950 border border-white/40 rounded-2xl p-4 z-50 flex items-center justify-between alert-glow">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                </svg>
+            </div>
+            <div>
+                <p id="alert-title" class="text-sm font-semibold text-white tracking-wide">Alarm Ringing</p>
+                <p id="alert-subtitle" class="text-xs text-neutral-400">Time is up</p>
+            </div>
+        </div>
+        <button onclick="dismissAlert()" class="px-4 py-2 rounded-xl bg-white text-black text-xs font-semibold uppercase tracking-wider hover:bg-neutral-200 active:scale-95 transition">
+            Dismiss
+        </button>
+    </div>
+
+    <!-- Main View Container -->
+    <main class="flex-1 w-full max-w-2xl mx-auto px-4 flex flex-col justify-center overflow-hidden relative">
+
+        <!-- ================= 1. CLOCK VIEW ================= -->
+        <section id="view-clock" class="w-full h-full flex flex-col items-center justify-center space-y-5">
+            <div class="text-center space-y-1">
+                <p id="clock-date" class="text-xs sm:text-sm uppercase tracking-[0.3em] text-neutral-400 font-medium">THURSDAY, OCT 15</p>
+                <p id="clock-ampm" class="text-[11px] font-mono tracking-[0.25em] text-neutral-500 uppercase h-4"></p>
+            </div>
+
+            <!-- Folding Flip Clock Display (Compact & Perfectly Fitted) -->
+            <div class="w-full flex items-center justify-center gap-1 sm:gap-2.5 px-1">
+                <div class="flip-group">
+                    <div class="flip-unit" data-flip-id="clock-h1"></div>
+                    <div class="flip-unit" data-flip-id="clock-h2"></div>
+                </div>
+                <div class="flip-colon">
+                    <span></span><span></span>
+                </div>
+                <div class="flip-group">
+                    <div class="flip-unit" data-flip-id="clock-m1"></div>
+                    <div class="flip-unit" data-flip-id="clock-m2"></div>
+                </div>
+                <div class="flip-colon">
+                    <span></span><span></span>
+                </div>
+                <div class="flip-group">
+                    <div class="flip-unit" data-flip-id="clock-s1"></div>
+                    <div class="flip-unit" data-flip-id="clock-s2"></div>
+                </div>
+            </div>
+
+            <!-- Next Alarm Pill -->
+            <div id="next-alarm-pill" class="px-4 py-1.5 rounded-full border border-neutral-900 bg-neutral-950/80 text-neutral-400 text-xs flex items-center gap-2">
+                <svg class="w-3.5 h-3.5 text-neutral-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <circle cx="12" cy="13" r="8"></circle>
+                    <path stroke-linecap="round" d="M12 9v4l2.5 2.5M5 3L2 6m20 0l-3-3"></path>
+                </svg>
+                <span id="next-alarm-text">No active alarms</span>
+            </div>
+
+            <!-- Install App (front screen) -->
+            <button id="front-install-btn" onclick="installPWA()" class="hidden items-center justify-center gap-2 px-7 py-3.5 rounded-2xl bg-white text-black text-xs font-semibold uppercase tracking-widest hover:bg-neutral-200 active:scale-95 transition shadow-lg">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Install App
+            </button>
+
+        </section>
+
+        <!-- ================= 2. ALARM VIEW ================= -->
+        <section id="view-alarm" class="w-full h-full hidden flex-col pt-2 pb-4 overflow-hidden">
+            <div class="flex items-center justify-between bg-neutral-950 border border-neutral-900 rounded-2xl p-4 mb-4 shrink-0">
+                <div>
+                    <span class="text-[10px] uppercase tracking-[0.2em] text-neutral-500 block mb-0.5">Alarms</span>
+                    <h2 class="text-lg font-semibold text-white tracking-tight">Wake & Reminders</h2>
+                </div>
+                <button onclick="openAlarmModal()" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-xs uppercase tracking-wider hover:bg-neutral-200 active:scale-95 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    New Alarm
+                </button>
+            </div>
+            <div id="alarm-list" class="flex-1 overflow-y-auto space-y-2.5 pr-1"></div>
+        </section>
+
+        <!-- ================= 3. TIMER VIEW ================= -->
+        <section id="view-timer" class="w-full h-full hidden flex-col items-center justify-between py-4">
+            <div class="w-full flex items-center justify-between px-2">
+                <span class="text-xs uppercase tracking-[0.2em] text-neutral-500">Countdown</span>
+                <span id="timer-status-badge" class="text-[11px] font-mono uppercase tracking-widest text-neutral-400 px-2.5 py-0.5 rounded-full border border-neutral-900 bg-neutral-950">Ready</span>
+            </div>
+
+            <div class="flex flex-col items-center space-y-6 my-auto">
+                <div class="flex items-center justify-center gap-1.5 sm:gap-2.5">
+                    <div class="flex flex-col items-center gap-2">
+                        <div class="flip-group">
+                            <div class="flip-unit" data-flip-id="timer-h1"></div>
+                            <div class="flip-unit" data-flip-id="timer-h2"></div>
+                        </div>
+                        <span class="text-[10px] uppercase tracking-[0.25em] text-neutral-500">HRS</span>
+                    </div>
+                    <div class="flip-colon pb-5"><span></span><span></span></div>
+                    <div class="flex flex-col items-center gap-2">
+                        <div class="flip-group">
+                            <div class="flip-unit" data-flip-id="timer-m1"></div>
+                            <div class="flip-unit" data-flip-id="timer-m2"></div>
+                        </div>
+                        <span class="text-[10px] uppercase tracking-[0.25em] text-neutral-500">MIN</span>
+                    </div>
+                    <div class="flip-colon pb-5"><span></span><span></span></div>
+                    <div class="flex flex-col items-center gap-2">
+                        <div class="flip-group">
+                            <div class="flip-unit" data-flip-id="timer-s1"></div>
+                            <div class="flip-unit" data-flip-id="timer-s2"></div>
+                        </div>
+                        <span class="text-[10px] uppercase tracking-[0.25em] text-neutral-500">SEC</span>
+                    </div>
+                </div>
+
+                <div id="timer-setup-controls" class="w-full max-w-md flex flex-col items-center space-y-4">
+                    <div class="grid grid-cols-3 gap-3 w-full text-center">
+                        <div class="flex items-center justify-center gap-1 bg-neutral-950 border border-neutral-900 rounded-xl p-1.5">
+                            <button onclick="adjustTimer(3600, -1)" class="w-8 h-8 rounded-lg hover:bg-neutral-900 text-neutral-400 hover:text-white font-mono text-base transition">-</button>
+                            <span class="text-xs font-mono text-neutral-300 px-1">HR</span>
+                            <button onclick="adjustTimer(3600, 1)" class="w-8 h-8 rounded-lg hover:bg-neutral-900 text-neutral-400 hover:text-white font-mono text-base transition">+</button>
+                        </div>
+                        <div class="flex items-center justify-center gap-1 bg-neutral-950 border border-neutral-900 rounded-xl p-1.5">
+                            <button onclick="adjustTimer(60, -1)" class="w-8 h-8 rounded-lg hover:bg-neutral-900 text-neutral-400 hover:text-white font-mono text-base transition">-</button>
+                            <span class="text-xs font-mono text-neutral-300 px-1">MIN</span>
+                            <button onclick="adjustTimer(60, 1)" class="w-8 h-8 rounded-lg hover:bg-neutral-900 text-neutral-400 hover:text-white font-mono text-base transition">+</button>
+                        </div>
+                        <div class="flex items-center justify-center gap-1 bg-neutral-950 border border-neutral-900 rounded-xl p-1.5">
+                            <button onclick="adjustTimer(1, -15)" class="w-8 h-8 rounded-lg hover:bg-neutral-900 text-neutral-400 hover:text-white font-mono text-base transition">-</button>
+                            <span class="text-xs font-mono text-neutral-300 px-1">SEC</span>
+                            <button onclick="adjustTimer(1, 15)" class="w-8 h-8 rounded-lg hover:bg-neutral-900 text-neutral-400 hover:text-white font-mono text-base transition">+</button>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-center gap-2">
+                        <button onclick="setTimerPreset(60)" class="px-3 py-1.5 rounded-full text-xs font-mono border border-neutral-800 bg-neutral-950 text-neutral-300 hover:border-white hover:text-white transition">1m</button>
+                        <button onclick="setTimerPreset(180)" class="px-3 py-1.5 rounded-full text-xs font-mono border border-neutral-800 bg-neutral-950 text-neutral-300 hover:border-white hover:text-white transition">3m</button>
+                        <button onclick="setTimerPreset(300)" class="px-3 py-1.5 rounded-full text-xs font-mono border border-neutral-800 bg-neutral-950 text-neutral-300 hover:border-white hover:text-white transition">5m</button>
+                        <button onclick="setTimerPreset(600)" class="px-3 py-1.5 rounded-full text-xs font-mono border border-neutral-800 bg-neutral-950 text-neutral-300 hover:border-white hover:text-white transition">10m</button>
+                        <button onclick="setTimerPreset(1500)" class="px-3 py-1.5 rounded-full text-xs font-mono border border-neutral-800 bg-neutral-950 text-neutral-300 hover:border-white hover:text-white transition">25m</button>
+                        <button onclick="setTimerPreset(0)" class="px-3 py-1.5 rounded-full text-xs font-mono border border-neutral-900 bg-black text-neutral-500 hover:text-white transition">Clear</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-center gap-4 w-full max-w-xs pt-2">
+                <button id="timer-reset-btn" onclick="resetTimer()" class="flex-1 py-3.5 rounded-2xl border border-neutral-800 bg-neutral-950 text-white text-xs font-semibold uppercase tracking-widest hover:bg-neutral-900 active:scale-95 transition">Reset</button>
+                <button id="timer-toggle-btn" onclick="toggleTimer()" class="flex-1 py-3.5 rounded-2xl bg-white text-black text-xs font-semibold uppercase tracking-widest hover:bg-neutral-200 active:scale-95 transition">Start</button>
+            </div>
+        </section>
+
+        <!-- ================= 4. STOPWATCH VIEW ================= -->
+        <section id="view-stopwatch" class="w-full h-full hidden flex-col items-center justify-between pt-2 pb-3 overflow-hidden">
+            <div class="flex flex-col items-center shrink-0 my-2">
+                <div class="flex items-end justify-center gap-1.5 sm:gap-2.5">
+                    <div class="flip-group">
+                        <div class="flip-unit" data-flip-id="sw-m1"></div>
+                        <div class="flip-unit" data-flip-id="sw-m2"></div>
+                    </div>
+                    <div class="flip-colon pb-4"><span></span><span></span></div>
+                    <div class="flip-group">
+                        <div class="flip-unit" data-flip-id="sw-s1"></div>
+                        <div class="flip-unit" data-flip-id="sw-s2"></div>
+                    </div>
+                    <span class="text-xl font-mono text-neutral-600 pb-2">.</span>
+                    <div class="flip-group">
+                        <div class="flip-unit sm" data-flip-id="sw-ms1"></div>
+                        <div class="flip-unit sm" data-flip-id="sw-ms2"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-center gap-4 w-full max-w-xs my-3 shrink-0">
+                <button id="sw-secondary-btn" onclick="lapOrResetStopwatch()" disabled class="flex-1 py-3 rounded-2xl border border-neutral-800 bg-neutral-950 text-white text-xs font-semibold uppercase tracking-widest hover:bg-neutral-900 disabled:opacity-30 disabled:pointer-events-none active:scale-95 transition">Lap</button>
+                <button id="sw-primary-btn" onclick="toggleStopwatch()" class="flex-1 py-3 rounded-2xl bg-white text-black text-xs font-semibold uppercase tracking-widest hover:bg-neutral-200 active:scale-95 transition">Start</button>
+            </div>
+
+            <div class="w-full flex-1 bg-neutral-950/70 border border-neutral-900 rounded-2xl flex flex-col overflow-hidden">
+                <div class="px-4 py-2.5 border-b border-neutral-900 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-500 shrink-0">
+                    <span>Lap #</span>
+                    <span>Split</span>
+                    <span>Total</span>
+                </div>
+                <div id="lap-list" class="flex-1 overflow-y-auto divide-y divide-neutral-900/60 px-4">
+                    <div class="h-full flex items-center justify-center text-xs text-neutral-600 font-mono">No laps recorded</div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Add Alarm Modal -->
+    <div id="alarm-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="w-full max-w-sm bg-neutral-950 border border-neutral-800 rounded-3xl p-6 space-y-6 shadow-2xl">
+            <div class="flex items-center justify-between">
+                <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-white">Set New Alarm</h3>
+                <button onclick="closeAlarmModal()" class="text-neutral-500 hover:text-white p-1">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="flex items-center justify-center gap-4 py-2">
+                <div class="flex flex-col items-center gap-2">
+                    <button onclick="stepModalTime('h', 1)" class="w-12 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-xs">▲</button>
+                    <div id="modal-hour" class="w-20 h-20 rounded-2xl bg-card border border-neutral-800 flex items-center justify-center font-mono text-4xl font-bold text-white">07</div>
+                    <button onclick="stepModalTime('h', -1)" class="w-12 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-xs">▼</button>
+                </div>
+                <span class="text-3xl font-mono text-neutral-600">:</span>
+                <div class="flex flex-col items-center gap-2">
+                    <button onclick="stepModalTime('m', 1)" class="w-12 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-xs">▲</button>
+                    <div id="modal-minute" class="w-20 h-20 rounded-2xl bg-card border border-neutral-800 flex items-center justify-center font-mono text-4xl font-bold text-white">00</div>
+                    <button onclick="stepModalTime('m', -1)" class="w-12 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-xs">▼</button>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-[10px] uppercase tracking-[0.2em] text-neutral-400 mb-2">Label</label>
+                <input id="modal-label" type="text" maxlength="24" placeholder="Morning Workout" class="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-white text-sm placeholder-neutral-600 focus:outline-none focus:border-white transition">
+            </div>
+
+            <div class="flex gap-3 pt-1">
+                <button onclick="closeAlarmModal()" class="flex-1 py-3 rounded-xl border border-neutral-800 text-neutral-300 text-xs font-semibold uppercase tracking-wider hover:bg-neutral-900 transition">Cancel</button>
+                <button onclick="saveNewAlarm()" class="flex-1 py-3 rounded-xl bg-white text-black text-xs font-semibold uppercase tracking-wider hover:bg-neutral-200 transition">Save Alarm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="w-full max-w-md mx-auto px-4 pb-5 pt-2 shrink-0 z-30">
+        <div class="bg-neutral-950/90 border border-neutral-900 rounded-2xl p-1.5 grid grid-cols-4 gap-1 shadow-2xl">
+            <button onclick="switchTab('clock')" data-tab="clock" class="nav-btn flex flex-col items-center justify-center py-2.5 rounded-xl transition-all bg-white text-black">
+                <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 2"></path></svg>
+                <span class="text-[10px] font-semibold uppercase tracking-wider">Clock</span>
+            </button>
+            <button onclick="switchTab('alarm')" data-tab="alarm" class="nav-btn flex flex-col items-center justify-center py-2.5 rounded-xl transition-all text-neutral-500 hover:text-white">
+                <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4l2 2M5 3L2 6m20 0l-3-3"></path></svg>
+                <span class="text-[10px] font-semibold uppercase tracking-wider">Alarm</span>
+            </button>
+            <button onclick="switchTab('timer')" data-tab="timer" class="nav-btn flex flex-col items-center justify-center py-2.5 rounded-xl transition-all text-neutral-500 hover:text-white">
+                <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 2h4m-2 12V9m8 4a8 8 0 11-16 0 8 8 0 0116 0z"></path></svg>
+                <span class="text-[10px] font-semibold uppercase tracking-wider">Timer</span>
+            </button>
+            <button onclick="switchTab('stopwatch')" data-tab="stopwatch" class="nav-btn flex flex-col items-center justify-center py-2.5 rounded-xl transition-all text-neutral-500 hover:text-white">
+                <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span class="text-[10px] font-semibold uppercase tracking-wider">Stopwatch</span>
+            </button>
+        </div>
+    </nav>
+
+    <script src="app.js"></script>
+</body>
+</html>
